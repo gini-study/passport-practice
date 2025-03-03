@@ -16,6 +16,15 @@ const userSchema = new mongoose.Schema({
   },
 });
 
+userSchema.methods.comparePassword = function (plainPassword, cb) {
+  // plain password => client , this.password => db에 존재하는 password
+  if (plainPassword === this.password) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
+
 const User = mongoose.model("User", userSchema);
 
 module.exports = User;

@@ -1,7 +1,44 @@
+// server.js
 const express = require("express");
 const path = require("path");
+const passport = require("passport");
+const User = require("./models/users.model");
 const { default: mongoose } = require("mongoose");
+const cookieSession = require("cookie-session");
+const cookieEncryptionKey = ["key1", "key2"];
+const {
+  checkAuthenticated,
+  checkNotAuthenticated,
+} = require("./middleware/auth.js");
 const app = express();
+
+app.use(
+  cookieSession({
+    name: "session",
+    keys: cookieEncryptionKey,
+    maxAge: 24 * 60 * 60 * 1000, // 24시간 유효
+    path: "/",
+    httpOnly: true,
+  })
+);
+
+app.use(function (req, res, next) {
+  if (req.session && !req.session.regenerate) {
+    req.session.regenerate = (cb) => {
+      cb();
+    };
+  }
+  if (req.session && !req.session.save) {
+    req.session.save = (cb) => {
+      cb();
+    };
+  }
+  next();
+});
+
+app.use(passport.initialize());
+app.use(passport.session());
+require("./config/passport");
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -9,6 +46,8 @@ app.use(express.urlencoded({ extended: false }));
 // view engine configuration
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
+
+// -----------------------------------------------------
 
 mongoose.set("strictQuery", false);
 mongoose
@@ -24,13 +63,51 @@ mongoose
 
 app.use("/static", express.static(path.join(__dirname, "public")));
 
-app.get("/login", (req, res) => {
+// -----------------------------------------------------
+
+app.get("/", checkAuthenticated, (req, res) => {
+  res.render("index");
+});
+
+app.get("/login", checkNotAuthenticated, (req, res) => {
   res.render("login");
 });
 
-app.get("/signup", (req, res) => {
+app.post("/login", (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      return next(err);
+    }
+    if (!user) {
+      return res.json({ msg: info });
+    }
+
+    req.logIn(user, function (err) {
+      if (err) {
+        return next(err);
+      }
+      res.redirect("/");
+    });
+  })(req, res, next);
+});
+
+app.get("/signup", checkNotAuthenticated, (req, res) => {
   res.render("signup");
 });
+
+app.post("/signup", async (req, res) => {
+  // user 객체 생성
+  const user = new User(req.body);
+  try {
+    // user 컬렉션에 유저 저장
+    await user.save();
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+// -----------------------------------------------------
 
 const port = 3000;
 app.listen(port, () => {
