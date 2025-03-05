@@ -116,6 +116,15 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+app.get("/auth/google", passport.authenticate("google"));
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", {
+    successReturnToOrRedirect: "/",
+    failureRedirect: "/login",
+  })
+);
+
 // -----------------------------------------------------
 
 const port = 3000;
